@@ -1,0 +1,49 @@
+name: Flutter Android Release Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - prepare-google-play-release-2
+
+jobs:
+  analyze-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Android SDK platform 36
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Ensure Android scaffold exists
+        run: |
+          flutter create . --platforms=android --org com.maraphuc --project-name quiz_vocab
+
+      - name: Restore release Gradle config
+        run: |
+          git checkout -- android/settings.gradle android/build.gradle android/gradle.properties android/app/build.gradle android/app/src/main/AndroidManifest.xml android/app/proguard-rules.pro
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart
+        run: flutter analyze
+
+      - name: Build release app bundle with debug signing
+        run: flutter build appbundle --release
