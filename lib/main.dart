@@ -35,37 +35,21 @@ class _QuizVocabAppState extends State<QuizVocabApp> {
       title: 'Quiz Vocab',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      home: MainNavigationScreen(onThemeChanged: setDarkMode),
-    );
-  }
-}
-
-class AppTheme {
-  static ThemeData get light => ThemeData(
+      theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: const Color(0xFF4F46E5),
         brightness: Brightness.light,
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        ),
-      );
-
-  static ThemeData get dark => ThemeData(
+      ),
+      darkTheme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: const Color(0xFF818CF8),
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF020617),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          color: const Color(0xFF0F172A),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        ),
-      );
+      ),
+      home: MainNavigationScreen(onThemeChanged: setDarkMode),
+    );
+  }
 }
 
 class Topic {
@@ -108,7 +92,7 @@ class VocabWord {
   final List<String> wrongOptions;
 }
 
-enum QuestionType { enToVi, viToEn, fillBlank }
+enum QuestionType { meaning, reverse, blank, pronunciation, context }
 
 class QuizQuestion {
   const QuizQuestion({
@@ -149,11 +133,32 @@ class WrongWordRecord {
         'lastWrongAt': lastWrongAt,
       };
 
-  static WrongWordRecord fromJson(Map<String, dynamic> json) => WrongWordRecord(
-        wordId: json['wordId'] as String,
-        wrongCount: (json['wrongCount'] as num?)?.toInt() ?? 1,
-        lastWrongAt: json['lastWrongAt'] as String? ?? DateTime.now().toIso8601String(),
-      );
+  static WrongWordRecord fromJson(Map<String, dynamic> json) {
+    return WrongWordRecord(
+      wordId: json['wordId'] as String? ?? '',
+      wrongCount: (json['wrongCount'] as num?)?.toInt() ?? 1,
+      lastWrongAt: json['lastWrongAt'] as String? ?? DateTime.now().toIso8601String(),
+    );
+  }
+}
+
+class TopicStat {
+  TopicStat({this.completedCount = 0, this.highestScore = 0});
+
+  int completedCount;
+  int highestScore;
+
+  Map<String, dynamic> toJson() => {
+        'completedCount': completedCount,
+        'highestScore': highestScore,
+      };
+
+  static TopicStat fromJson(Map<String, dynamic> json) {
+    return TopicStat(
+      completedCount: (json['completedCount'] as num?)?.toInt() ?? 0,
+      highestScore: (json['highestScore'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 class UserProgress {
@@ -189,7 +194,7 @@ class UserProgress {
         'streakDays': streakDays,
         'lastActiveDate': lastActiveDate,
         'topicStats': topicStats.map((key, value) => MapEntry(key, value.toJson())),
-        'wrongWords': wrongWords.map((e) => e.toJson()).toList(),
+        'wrongWords': wrongWords.map((record) => record.toJson()).toList(),
       };
 
   static UserProgress fromJson(Map<String, dynamic> json) {
@@ -208,7 +213,10 @@ class UserProgress {
     if (rawWrong is List) {
       for (final item in rawWrong) {
         if (item is Map) {
-          wrong.add(WrongWordRecord.fromJson(Map<String, dynamic>.from(item)));
+          final parsed = WrongWordRecord.fromJson(Map<String, dynamic>.from(item));
+          if (parsed.wordId.isNotEmpty) {
+            wrong.add(parsed);
+          }
         }
       }
     }
@@ -226,150 +234,255 @@ class UserProgress {
   }
 }
 
-class TopicStat {
-  TopicStat({this.completedCount = 0, this.highestScore = 0});
+class QuizResultData {
+  const QuizResultData({
+    required this.topicId,
+    required this.topicTitle,
+    required this.correctCount,
+    required this.totalQuestions,
+    required this.wrongWords,
+    required this.percent,
+  });
 
-  int completedCount;
-  int highestScore;
-
-  Map<String, dynamic> toJson() => {
-        'completedCount': completedCount,
-        'highestScore': highestScore,
-      };
-
-  static TopicStat fromJson(Map<String, dynamic> json) => TopicStat(
-        completedCount: (json['completedCount'] as num?)?.toInt() ?? 0,
-        highestScore: (json['highestScore'] as num?)?.toInt() ?? 0,
-      );
+  final String topicId;
+  final String topicTitle;
+  final int correctCount;
+  final int totalQuestions;
+  final List<VocabWord> wrongWords;
+  final int percent;
 }
 
 String todayString() => DateTime.now().toIso8601String().split('T').first;
 
 const topics = <Topic>[
-  Topic(id: 'everyday', title: 'Everyday Life', titleVi: 'Cuộc sống hàng ngày', icon: Icons.wb_sunny_rounded, level: 'A1 - A2', description: 'Thói quen, nhà cửa và hoạt động thường nhật.'),
-  Topic(id: 'school', title: 'School', titleVi: 'Trường học', icon: Icons.school_rounded, level: 'A1 - B1', description: 'Môn học, lớp học và dụng cụ học tập.'),
-  Topic(id: 'work', title: 'Work', titleVi: 'Công việc', icon: Icons.work_rounded, level: 'A2 - B2', description: 'Văn phòng, họp hành và giao tiếp công sở.'),
-  Topic(id: 'travel', title: 'Travel', titleVi: 'Du lịch', icon: Icons.flight_takeoff_rounded, level: 'A2 - B1', description: 'Sân bay, khách sạn, hỏi đường và di chuyển.'),
-  Topic(id: 'food', title: 'Food', titleVi: 'Ẩm thực', icon: Icons.restaurant_rounded, level: 'A1 - A2', description: 'Món ăn, đồ uống, hương vị và nhà hàng.'),
-  Topic(id: 'tech', title: 'Technology', titleVi: 'Công nghệ', icon: Icons.devices_rounded, level: 'A2 - B2', description: 'Máy tính, phần mềm, internet và thiết bị số.'),
-  Topic(id: 'health', title: 'Health', titleVi: 'Sức khỏe', icon: Icons.favorite_rounded, level: 'A2 - B2', description: 'Cơ thể, triệu chứng, luyện tập và dinh dưỡng.'),
-  Topic(id: 'business', title: 'Business English', titleVi: 'Tiếng Anh thương mại', icon: Icons.trending_up_rounded, level: 'B1 - B2', description: 'Tài chính, hợp đồng, tiếp thị và thương lượng.'),
+  Topic(id: 'everyday', title: 'Everyday Life', titleVi: 'Cuộc sống hàng ngày', icon: Icons.wb_sunny_rounded, level: 'A1 - B1', description: 'Thói quen, nhà cửa và tình huống hằng ngày.'),
+  Topic(id: 'school', title: 'School', titleVi: 'Trường học', icon: Icons.school_rounded, level: 'A1 - B2', description: 'Lớp học, bài kiểm tra và nghiên cứu.'),
+  Topic(id: 'work', title: 'Work', titleVi: 'Công việc', icon: Icons.work_rounded, level: 'A2 - B2', description: 'Văn phòng, cuộc họp và giao tiếp chuyên nghiệp.'),
+  Topic(id: 'travel', title: 'Travel', titleVi: 'Du lịch', icon: Icons.flight_takeoff_rounded, level: 'A1 - B2', description: 'Sân bay, khách sạn, lịch trình và điểm đến.'),
+  Topic(id: 'food', title: 'Food', titleVi: 'Ẩm thực', icon: Icons.restaurant_rounded, level: 'A1 - B1', description: 'Món ăn, đồ uống, hương vị và nhà hàng.'),
+  Topic(id: 'tech', title: 'Technology', titleVi: 'Công nghệ', icon: Icons.devices_rounded, level: 'A2 - B2', description: 'Thiết bị, phần mềm, AI và an toàn số.'),
+  Topic(id: 'health', title: 'Health', titleVi: 'Sức khỏe', icon: Icons.favorite_rounded, level: 'A2 - B2', description: 'Triệu chứng, khám bệnh và lối sống khỏe.'),
+  Topic(id: 'business', title: 'Business English', titleVi: 'Tiếng Anh thương mại', icon: Icons.trending_up_rounded, level: 'B1 - B2', description: 'Tài chính, hợp đồng và chiến lược.'),
+  Topic(id: 'shopping', title: 'Shopping', titleVi: 'Mua sắm', icon: Icons.shopping_bag_rounded, level: 'A1 - B1', description: 'Giá cả, thanh toán, đổi trả và giao hàng.'),
+  Topic(id: 'environment', title: 'Environment', titleVi: 'Môi trường', icon: Icons.eco_rounded, level: 'A2 - B2', description: 'Khí hậu, tái chế và bảo vệ thiên nhiên.'),
+  Topic(id: 'sports', title: 'Sports & Hobbies', titleVi: 'Thể thao & sở thích', icon: Icons.sports_soccer_rounded, level: 'A1 - B2', description: 'Luyện tập, trận đấu và hoạt động giải trí.'),
+  Topic(id: 'media', title: 'Media & Culture', titleVi: 'Truyền thông & văn hóa', icon: Icons.movie_creation_rounded, level: 'A2 - B2', description: 'Phim ảnh, tin tức, mạng xã hội và văn hóa.'),
+  Topic(id: 'emotions', title: 'Emotions', titleVi: 'Cảm xúc & tính cách', icon: Icons.mood_rounded, level: 'A1 - B2', description: 'Cảm xúc, thái độ và phẩm chất cá nhân.'),
+  Topic(id: 'phrasal', title: 'Phrasal Verbs', titleVi: 'Cụm động từ', icon: Icons.extension_rounded, level: 'B1 - B2', description: 'Cụm động từ thường gặp trong giao tiếp.'),
+  Topic(id: 'idioms', title: 'Idioms', titleVi: 'Thành ngữ', icon: Icons.lightbulb_rounded, level: 'B1 - B2', description: 'Thành ngữ thông dụng trong nói và đọc hiểu.'),
+  Topic(id: 'testprep', title: 'Exam Prep', titleVi: 'Ôn thi tiếng Anh', icon: Icons.quiz_rounded, level: 'A2 - B2', description: 'Từ vựng học thuật và kỹ năng làm bài.'),
 ];
 
-List<VocabWord> topicWords(String topicId, List<List<String>> rows) {
-  return List.generate(rows.length, (index) {
-    final row = rows[index];
+final vocabRows = <String, List<List<String>>>{
+  'everyday': [
+    ['Routine', 'Thói quen hằng ngày', '/ruːˈtiːn/', 'My daily ___ starts with a short walk.', 'A2', 'Kỳ nghỉ|Bài kiểm tra|Món tráng miệng'],
+    ['Neighbourhood', 'Khu xóm', '/ˈneɪ.bə.hʊd/', 'Our ___ is quiet and friendly.', 'A2', 'Sân bay|Nhà máy|Phòng họp'],
+    ['Appliance', 'Thiết bị gia dụng', '/əˈplaɪ.əns/', 'A washing machine is a useful ___.', 'B1', 'Môn học|Đồ uống|Hợp đồng'],
+    ['Leisure', 'Thời gian rảnh', '/ˈleʒ.ər/', 'Reading is my favorite ___ activity.', 'B1', 'Áp lực|Bệnh viện|Hóa đơn'],
+    ['Chore', 'Việc nhà lặt vặt', '/tʃɔːr/', 'Taking out the trash is a household ___.', 'A2', 'Chuyến bay|Lễ hội|Mức lương'],
+    ['Convenient', 'Tiện lợi', '/kənˈviː.ni.ənt/', 'Online payment is very ___.', 'A2', 'Đắng|Nguy hiểm|Bí mật'],
+    ['Grateful', 'Biết ơn', '/ˈɡreɪt.fəl/', 'I am ___ for your support.', 'A2', 'Tức giận|Ồn ào|Đắt đỏ'],
+    ['Punctual', 'Đúng giờ', '/ˈpʌŋk.tʃu.əl/', 'Please be ___ for the appointment.', 'B1', 'Muộn|Mặn|Bị hỏng'],
+    ['Commute', 'Đi lại hằng ngày', '/kəˈmjuːt/', 'My ___ takes forty minutes by bus.', 'B1', 'Bữa sáng|Đơn thuốc|Bản nhạc'],
+    ['Errand', 'Việc vặt bên ngoài', '/ˈer.ənd/', 'I have to run an ___ after lunch.', 'B1', 'Học bổng|Sân vận động|Bản hợp đồng'],
+  ],
+  'school': [
+    ['Assignment', 'Bài tập được giao', '/əˈsaɪn.mənt/', 'The teacher gave us a new ___.', 'A2', 'Sân bay|Hóa đơn|Bữa ăn'],
+    ['Lecture', 'Bài giảng', '/ˈlek.tʃər/', 'The history ___ was interesting.', 'B1', 'Khách sạn|Triệu chứng|Hợp đồng'],
+    ['Scholarship', 'Học bổng', '/ˈskɑː.lɚ.ʃɪp/', 'She won a ___ to study abroad.', 'B1', 'Tiền phạt|Vé tàu|Đơn thuốc'],
+    ['Textbook', 'Sách giáo khoa', '/ˈtekst.bʊk/', 'Open your ___ to page ten.', 'A1', 'Bàn chải|Hộ chiếu|Bảo hành'],
+    ['Classmate', 'Bạn cùng lớp', '/ˈklæs.meɪt/', 'My ___ helped me with math.', 'A1', 'Khách hàng|Bác sĩ|Đầu bếp'],
+    ['Subject', 'Môn học', '/ˈsʌb.dʒekt/', 'English is my favorite ___.', 'A1', 'Hương vị|Thiết bị|Chuyến đi'],
+    ['Improve', 'Cải thiện', '/ɪmˈpruːv/', 'Practice can ___ your speaking.', 'A2', 'Hủy bỏ|Che giấu|Giảm giá'],
+    ['Research', 'Nghiên cứu', '/rɪˈsɝːtʃ/', 'We did ___ for our project.', 'B1', 'Giải trí|Tập thể dục|Mua hàng'],
+    ['Semester', 'Học kỳ', '/səˈmes.tɚ/', 'The new ___ begins in September.', 'B1', 'Biên lai|Món khai vị|Huy chương'],
+    ['Fluent', 'Lưu loát', '/ˈfluː.ənt/', 'She is ___ in English.', 'B1', 'Đầy bụi|Đang giảm|Bị khóa'],
+  ],
+  'work': [
+    ['Deadline', 'Hạn chót', '/ˈded.laɪn/', 'We must finish before the ___.', 'B1', 'Kỳ nghỉ|Triệu chứng|Món tráng miệng'],
+    ['Colleague', 'Đồng nghiệp', '/ˈkɑː.liːɡ/', 'My ___ sits next to me.', 'A2', 'Bạn cùng lớp|Hành khách|Bệnh nhân'],
+    ['Meeting', 'Cuộc họp', '/ˈmiː.tɪŋ/', 'The ___ starts at nine.', 'A1', 'Bữa sáng|Kỳ thi|Chuyến bay'],
+    ['Manager', 'Quản lý', '/ˈmæn.ɪ.dʒɚ/', 'The ___ approved the plan.', 'A2', 'Phi công|Y tá|Hướng dẫn viên'],
+    ['Salary', 'Lương', '/ˈsæl.ɚ.i/', 'Her ___ increased this year.', 'A2', 'Bài giảng|Hộ chiếu|Thành phần'],
+    ['Promotion', 'Sự thăng chức', '/prəˈmoʊ.ʃən/', 'He got a ___ after two years.', 'B1', 'Sự hoãn chuyến|Cơn đau|Lời khuyên'],
+    ['Client', 'Khách hàng', '/ˈklaɪ.ənt/', 'The ___ requested a report.', 'B1', 'Giáo viên|Hành lý|Đầu bếp'],
+    ['Efficient', 'Hiệu quả', '/ɪˈfɪʃ.ənt/', 'This system is fast and ___.', 'B2', 'Ngon miệng|Đau đớn|Lạc đường'],
+    ['Collaborate', 'Hợp tác', '/kəˈlæb.ə.reɪt/', 'Teams ___ on the same document.', 'B2', 'Ghen tị|Rò rỉ|Nếm thử'],
+    ['Workload', 'Khối lượng công việc', '/ˈwɝːk.loʊd/', 'My ___ is heavy this week.', 'B2', 'Mùi vị|Hành lý|Thực đơn'],
+  ],
+  'travel': [
+    ['Destination', 'Điểm đến', '/ˌdes.təˈneɪ.ʃən/', 'Paris is our next ___.', 'A2', 'Hóa đơn|Triệu chứng|Từ điển'],
+    ['Luggage', 'Hành lý', '/ˈlʌɡ.ɪdʒ/', 'My ___ is very heavy.', 'A2', 'Bài tập|Đơn thuốc|Mức lương'],
+    ['Reservation', 'Sự đặt chỗ', '/ˌrez.ɚˈveɪ.ʃən/', 'I made a hotel ___.', 'B1', 'Sự thăng chức|Cơn đau|Món ăn'],
+    ['Itinerary', 'Lịch trình chuyến đi', '/aɪˈtɪn.ə.rer.i/', 'Our ___ includes three cities.', 'B1', 'Công thức nấu ăn|Bài kiểm tra|Hợp đồng'],
+    ['Departure', 'Sự khởi hành', '/dɪˈpɑːr.tʃɚ/', 'The ___ time is 7 a.m.', 'B1', 'Bữa trưa|Cuộc họp|Đơn hàng'],
+    ['Accommodation', 'Chỗ ở', '/əˌkɑː.məˈdeɪ.ʃən/', 'We found cheap ___.', 'B1', 'Bài giảng|Thiết bị|Triệu chứng'],
+    ['Tourist', 'Khách du lịch', '/ˈtʊr.ɪst/', 'The ___ asked for directions.', 'A1', 'Bệnh nhân|Quản lý|Đồng nghiệp'],
+    ['Explore', 'Khám phá', '/ɪkˈsplɔːr/', 'We want to ___ the old town.', 'A2', 'In ấn|Nghỉ ốm|Thanh toán'],
+    ['Souvenir', 'Quà lưu niệm', '/ˌsuː.vəˈnɪr/', 'I bought a ___ for my sister.', 'B1', 'Vắc xin|Học kỳ|Mật khẩu'],
+    ['Currency', 'Tiền tệ', '/ˈkɝː.ən.si/', 'You should exchange ___ before traveling.', 'B1', 'Chỗ ngồi|Thời tiết|Cảm xúc'],
+  ],
+  'food': [
+    ['Ingredient', 'Nguyên liệu', '/ɪnˈɡriː.di.ənt/', 'Tomato is the main ___.', 'A2', 'Hành lý|Màn hình|Học bổng'],
+    ['Delicious', 'Ngon', '/dɪˈlɪʃ.əs/', 'This soup is ___.', 'A1', 'Đau|Đắt|Muộn'],
+    ['Appetizer', 'Món khai vị', '/ˈæp.ə.taɪ.zɚ/', 'We ordered an ___ first.', 'B1', 'Môn học|Hợp đồng|Cổng sân bay'],
+    ['Beverage', 'Đồ uống', '/ˈbev.ɚ.ɪdʒ/', 'Tea is a popular ___.', 'B1', 'Thiết bị|Nơi ở|Nhiệm vụ'],
+    ['Recipe', 'Công thức nấu ăn', '/ˈres.ə.pi/', 'I followed the ___ carefully.', 'A2', 'Lịch trình|Bài giảng|Đơn thuốc'],
+    ['Flavor', 'Hương vị', '/ˈfleɪ.vɚ/', 'The ___ is sweet and fresh.', 'A2', 'Mức lương|Địa chỉ|Triệu chứng'],
+    ['Spicy', 'Cay', '/ˈspaɪ.si/', 'This curry is too ___.', 'A1', 'Lạnh|Im lặng|Chính xác'],
+    ['Dessert', 'Món tráng miệng', '/dɪˈzɝːt/', 'Ice cream is my favorite ___.', 'A1', 'Văn phòng|Bài tập|Hóa đơn'],
+    ['Nutritious', 'Bổ dưỡng', '/nuːˈtrɪʃ.əs/', 'Vegetables are very ___.', 'B1', 'Ồn ào|Rỗng|Xa xôi'],
+    ['Takeaway', 'Đồ ăn mang đi', '/ˈteɪk.ə.weɪ/', 'We ordered ___ tonight.', 'B1', 'Nghiên cứu|Lịch trình|Tái chế'],
+  ],
+  'tech': [
+    ['Device', 'Thiết bị', '/dɪˈvaɪs/', 'A phone is a useful ___.', 'A2', 'Món ăn|Học bổng|Triệu chứng'],
+    ['Software', 'Phần mềm', '/ˈsɑːft.wer/', 'This ___ helps edit photos.', 'A2', 'Hành lý|Công thức|Đơn thuốc'],
+    ['Password', 'Mật khẩu', '/ˈpæs.wɝːd/', 'Never share your ___.', 'A2', 'Hóa đơn|Món tráng miệng|Điểm đến'],
+    ['Connection', 'Kết nối', '/kəˈnek.ʃən/', 'The internet ___ is slow.', 'B1', 'Mùi vị|Cơn đau|Đường bay'],
+    ['Privacy', 'Quyền riêng tư', '/ˈpraɪ.və.si/', 'Online ___ is important.', 'B1', 'Khai vị|Đúng giờ|Học phí'],
+    ['Search Engine', 'Công cụ tìm kiếm', '/sɝːtʃ ˈen.dʒɪn/', 'Google is a ___.', 'A2', 'Sổ tay|Bệnh viện|Quầy lễ tân'],
+    ['Artificial Intelligence', 'Trí tuệ nhân tạo', '/ˌɑːr.t̬əˈfɪʃ.əl ɪnˈtel.ə.dʒəns/', '___ can support learning.', 'B2', 'Đồ uống nóng|Hành lý ký gửi|Việc nhà'],
+    ['Cybersecurity', 'An ninh mạng', '/ˌsaɪ.bɚ.sɪˈkjʊr.ə.t̬i/', 'Companies invest in ___.', 'B2', 'Ẩm thực|Thể dục|Du lịch'],
+    ['Backup', 'Sao lưu', '/ˈbæk.ʌp/', 'Make a ___ of your data.', 'B1', 'Lời xin lỗi|Đường vòng|Trận đấu'],
+    ['Algorithm', 'Thuật toán', '/ˈæl.ɡə.rɪ.ðəm/', 'The ___ ranks search results.', 'B2', 'Bảo tàng|Hóa đơn|Cơn sốt'],
+  ],
+  'health': [
+    ['Symptom', 'Triệu chứng', '/ˈsɪmp.təm/', 'Fever is a common ___.', 'A2', 'Hộ chiếu|Món ăn|Bài tập'],
+    ['Appointment', 'Cuộc hẹn', '/əˈpɔɪnt.mənt/', 'I have a doctor ___ tomorrow.', 'A2', 'Hợp đồng|Lịch bay|Công thức'],
+    ['Medicine', 'Thuốc', '/ˈmed.ə.sən/', 'Take this ___ twice a day.', 'A1', 'Mật khẩu|Hành lý|Học bổng'],
+    ['Exercise', 'Tập thể dục', '/ˈek.sɚ.saɪz/', 'Daily ___ improves health.', 'A1', 'Bảo hành|Thực đơn|Bài giảng'],
+    ['Nutrition', 'Dinh dưỡng', '/nuːˈtrɪʃ.ən/', 'Good ___ is essential.', 'B1', 'Khởi hành|Hợp đồng|Bài hát'],
+    ['Recover', 'Hồi phục', '/rɪˈkʌv.ɚ/', 'She needs time to ___.', 'B1', 'Đặt bàn|Tải xuống|Tái chế'],
+    ['Injury', 'Chấn thương', '/ˈɪn.dʒɚ.i/', 'He had a knee ___.', 'A2', 'Học kỳ|Biên lai|Địa chỉ'],
+    ['Treatment', 'Sự điều trị', '/ˈtriːt.mənt/', 'The ___ was successful.', 'B1', 'Khuyến mãi|Chuyến tham quan|Bản nhạc'],
+    ['Prescription', 'Đơn thuốc', '/prɪˈskrɪp.ʃən/', 'The doctor wrote a ___.', 'B1', 'Bản đồ|Món tráng miệng|Lịch học'],
+    ['Mental Health', 'Sức khỏe tinh thần', '/ˈmen.təl helθ/', 'Sleep supports good ___.', 'B2', 'Thẻ lên máy bay|Thực đơn|Mã giảm giá'],
+  ],
+  'business': [
+    ['Revenue', 'Doanh thu', '/ˈrev.ə.nuː/', 'The company revenue increased.', 'B2', 'Hành lý|Triệu chứng|Món ăn'],
+    ['Profit', 'Lợi nhuận', '/ˈprɑː.fɪt/', 'The store made a big ___.', 'B1', 'Bài giảng|Bệnh viện|Hương vị'],
+    ['Contract', 'Hợp đồng', '/ˈkɑːn.trækt/', 'They signed a new ___.', 'B1', 'Hộ chiếu|Món tráng miệng|Lịch bay'],
+    ['Negotiate', 'Đàm phán', '/nəˈɡoʊ.ʃi.eɪt/', 'We need to ___ the price.', 'B2', 'Nấu ăn|Khám bệnh|Tái chế'],
+    ['Investment', 'Khoản đầu tư', '/ɪnˈvest.mənt/', 'The startup received an ___.', 'B2', 'Món khai vị|Kỳ thi|Cơn ho'],
+    ['Strategy', 'Chiến lược', '/ˈstræt̬.ə.dʒi/', 'Our marketing ___ is clear.', 'B2', 'Biên lai|Hành trình|Mật khẩu'],
+    ['Invoice', 'Hóa đơn', '/ˈɪn.vɔɪs/', 'Please send the ___ today.', 'B1', 'Đơn thuốc|Bài hát|Học bổng'],
+    ['Brand', 'Thương hiệu', '/brænd/', 'This ___ is popular with teens.', 'B1', 'Địa chỉ|Triệu chứng|Cửa lên máy bay'],
+    ['Supplier', 'Nhà cung cấp', '/səˈplaɪ.ɚ/', 'We changed our main ___.', 'B1', 'Du khách|Gia sư|Vận động viên'],
+    ['Partnership', 'Quan hệ đối tác', '/ˈpɑːrt.nɚ.ʃɪp/', 'The companies formed a ___.', 'B2', 'Học bổng|Lời nhắc|Món khai vị'],
+  ],
+  'shopping': [
+    ['Receipt', 'Biên lai', '/rɪˈsiːt/', 'Keep the ___ after paying.', 'A2', 'Triệu chứng|Hộ chiếu|Bài giảng'],
+    ['Discount', 'Giảm giá', '/ˈdɪs.kaʊnt/', 'This jacket has a 20 percent ___.', 'A2', 'Cơn đau|Lịch trình|Bài tập'],
+    ['Refund', 'Hoàn tiền', '/ˈriː.fʌnd/', 'I asked for a ___.', 'B1', 'Điểm đến|Món chính|Cơn sốt'],
+    ['Warranty', 'Bảo hành', '/ˈwɔːr.ən.t̬i/', 'The laptop has a two-year ___.', 'B1', 'Gia vị|Học kỳ|Mức lương'],
+    ['Bargain', 'Món hời', '/ˈbɑːr.ɡən/', 'This phone case is a ___.', 'B1', 'Bài luận|Hành lý|Triệu chứng'],
+    ['Checkout', 'Quầy thanh toán', '/ˈtʃek.aʊt/', 'Please pay at the ___.', 'A2', 'Phòng khám|Sân bóng|Lịch bay'],
+    ['Cart', 'Giỏ hàng', '/kɑːrt/', 'Add the item to your ___.', 'A1', 'Hợp đồng|Công thức|Bệnh nhân'],
+    ['Exchange', 'Đổi hàng', '/ɪksˈtʃeɪndʒ/', 'Can I ___ this shirt?', 'A2', 'Tốt nghiệp|Điều trị|Tái chế'],
+    ['Affordable', 'Giá phải chăng', '/əˈfɔːr.də.bəl/', 'The shoes are stylish and ___.', 'B1', 'Cay|Bị hoãn|Mệt mỏi'],
+    ['Delivery', 'Giao hàng', '/dɪˈlɪv.ɚ.i/', 'Free ___ is available.', 'A2', 'Học bổng|Kỳ thi|Triệu chứng'],
+  ],
+  'environment': [
+    ['Recycle', 'Tái chế', '/ˌriːˈsaɪ.kəl/', 'We should ___ plastic bottles.', 'A2', 'Tuyển dụng|Nếm thử|Đặt phòng'],
+    ['Pollution', 'Ô nhiễm', '/pəˈluː.ʃən/', 'Air ___ harms our health.', 'B1', 'Học bổng|Món ăn|Sự thăng chức'],
+    ['Climate', 'Khí hậu', '/ˈklaɪ.mət/', 'The ___ is changing quickly.', 'B1', 'Biên lai|Bài giảng|Hương vị'],
+    ['Renewable', 'Có thể tái tạo', '/rɪˈnuː.ə.bəl/', 'Solar power is a ___ energy source.', 'B2', 'Cay|Bị khóa|Tạm thời'],
+    ['Wildlife', 'Động vật hoang dã', '/ˈwaɪld.laɪf/', 'The park protects ___.', 'B1', 'Lương|Mật khẩu|Món khai vị'],
+    ['Conserve', 'Bảo tồn', '/kənˈsɝːv/', 'We must ___ water.', 'B2', 'Hoàn tiền|Thuyết trình|Nấu nướng'],
+    ['Waste', 'Rác thải', '/weɪst/', 'Reduce food ___ at home.', 'A2', 'Môn học|Đơn thuốc|Chuyến bay'],
+    ['Ecosystem', 'Hệ sinh thái', '/ˈiː.koʊˌsɪs.təm/', 'A forest is a complex ___.', 'B2', 'Hóa đơn|Món ăn|Bảo hành'],
+    ['Sustainable', 'Bền vững', '/səˈsteɪ.nə.bəl/', 'We need ___ solutions.', 'B2', 'Đầy bụi|Rất cay|Bị trễ'],
+    ['Habitat', 'Môi trường sống', '/ˈhæb.ə.tæt/', 'Bamboo forests are a panda habitat.', 'B1', 'Hóa đơn|Bài tập|Khuôn viên'],
+  ],
+  'sports': [
+    ['Athlete', 'Vận động viên', '/ˈæθ.liːt/', 'The ___ trains every morning.', 'A2', 'Bác sĩ|Hành lý|Món ăn'],
+    ['Tournament', 'Giải đấu', '/ˈtʊr.nə.mənt/', 'Our team joined a local ___.', 'B1', 'Bài giảng|Hóa đơn|Triệu chứng'],
+    ['Coach', 'Huấn luyện viên', '/koʊtʃ/', 'The ___ explained the plan.', 'A2', 'Đầu bếp|Gia sư|Phi công'],
+    ['Stamina', 'Sức bền', '/ˈstæm.ə.nə/', 'Running improves your ___.', 'B2', 'Hương vị|Mật khẩu|Biên lai'],
+    ['Warm Up', 'Khởi động', '/wɔːrm ʌp/', 'Always ___ before exercise.', 'A2', 'Hoàn tiền|Nộp bài|Đặt bàn'],
+    ['Score', 'Ghi điểm', '/skɔːr/', 'He tried to ___ in the final minute.', 'A1', 'Nấu ăn|Tái chế|Tuyển dụng'],
+    ['Spectator', 'Khán giả', '/ˈspek.teɪ.t̬ɚ/', 'Every ___ cheered loudly.', 'B1', 'Bệnh nhân|Nhân viên|Hành khách'],
+    ['Hobby', 'Sở thích', '/ˈhɑː.bi/', 'Photography is my favorite ___.', 'A1', 'Hạn chót|Cơn đau|Thị phần'],
+    ['Competition', 'Cuộc thi', '/ˌkɑːm.pəˈtɪʃ.ən/', 'The ___ was exciting.', 'B1', 'Món súp|Phòng khám|Mật khẩu'],
+    ['Victory', 'Chiến thắng', '/ˈvɪk.tɚ.i/', 'The team celebrated a big ___.', 'B1', 'Lỗi phần mềm|Hóa đơn|Kỳ nghỉ'],
+  ],
+  'media': [
+    ['Headline', 'Tiêu đề tin', '/ˈhed.laɪn/', 'The ___ was shocking.', 'B1', 'Hóa đơn|Đơn thuốc|Hành lý'],
+    ['Podcast', 'Chương trình âm thanh', '/ˈpɑːd.kæst/', 'I listen to an English ___ daily.', 'A2', 'Thực đơn|Bài thuốc|Lịch bay'],
+    ['Episode', 'Tập phim', '/ˈep.ə.soʊd/', 'The final ___ was emotional.', 'A2', 'Khẩu phần|Học kỳ|Bảo hành'],
+    ['Audience', 'Khán giả', '/ˈɑː.di.əns/', 'The ___ laughed at the joke.', 'B1', 'Bệnh nhân|Nhà đầu tư|Phi công'],
+    ['Review', 'Bài đánh giá', '/rɪˈvjuː/', 'Read the movie ___ first.', 'B1', 'Học bổng|Cơn đau|Bài tập'],
+    ['Influencer', 'Người có ảnh hưởng', '/ˈɪn.flu.ən.sɚ/', 'The ___ promoted the product.', 'B2', 'Y tá|Hành khách|Vận động viên'],
+    ['Stream', 'Phát trực tuyến', '/striːm/', 'We can ___ the concert online.', 'B1', 'Đổi hàng|Tốt nghiệp|Khám bệnh'],
+    ['Culture', 'Văn hóa', '/ˈkʌl.tʃɚ/', 'Food is part of local ___.', 'A2', 'Hóa đơn|Mật khẩu|Cơn sốt'],
+    ['Subtitle', 'Phụ đề', '/ˈsʌbˌtaɪ.t̬əl/', 'Turn on English ___.', 'B1', 'Bảo hành|Hành lý|Món chính'],
+    ['Viral', 'Lan truyền nhanh', '/ˈvaɪ.rəl/', 'The video went ___ overnight.', 'B2', 'Bổ dưỡng|Bị hỏng|Rất cũ'],
+  ],
+  'emotions': [
+    ['Confident', 'Tự tin', '/ˈkɑːn.fə.dənt/', 'She felt ___ before the interview.', 'A2', 'Đói|Bị khóa|Cay'],
+    ['Anxious', 'Lo lắng', '/ˈæŋk.ʃəs/', 'He was ___ about the exam.', 'B1', 'Ngọt|Rẻ|Sạch'],
+    ['Curious', 'Tò mò', '/ˈkjʊr.i.əs/', 'Children are naturally ___.', 'A2', 'Rỗng|Muộn|Mặn'],
+    ['Patient', 'Kiên nhẫn', '/ˈpeɪ.ʃənt/', 'A good teacher is ___.', 'A2', 'Bệnh nhân|Biên lai|Món phụ'],
+    ['Reliable', 'Đáng tin cậy', '/rɪˈlaɪ.ə.bəl/', 'He is a ___ friend.', 'B1', 'Cay|Lạc đường|Bị hoãn'],
+    ['Generous', 'Hào phóng', '/ˈdʒen.ə.rəs/', 'She is ___ with her time.', 'B1', 'Keo kiệt|Bị khóa|Đầy bụi'],
+    ['Embarrassed', 'Xấu hổ', '/ɪmˈber.əst/', 'I felt ___ after the mistake.', 'B1', 'Tự hào|Đúng giờ|Bổ dưỡng'],
+    ['Proud', 'Tự hào', '/praʊd/', 'His parents were ___ of him.', 'A2', 'Đói|Bị lỗi|Lạnh'],
+    ['Calm', 'Bình tĩnh', '/kɑːm/', 'Stay ___ during the test.', 'A2', 'Ồn ào|Bị hỏng|Cay'],
+    ['Empathy', 'Sự đồng cảm', '/ˈem.pə.θi/', 'Great leaders show ___.', 'B2', 'Mật khẩu|Hóa đơn|Học kỳ'],
+  ],
+  'phrasal': [
+    ['Look Up', 'Tra cứu', '/lʊk ʌp/', 'Please ___ the new word.', 'B1', 'Vứt bỏ|Hoãn lại|Tăng tốc'],
+    ['Give Up', 'Từ bỏ', '/ɡɪv ʌp/', 'Do not ___ after one mistake.', 'B1', 'Tra cứu|Mặc thử|Đăng nhập'],
+    ['Set Up', 'Thiết lập', '/set ʌp/', 'We need to ___ the account.', 'B1', 'Hủy bỏ|Nếm thử|Bảo tồn'],
+    ['Run Out Of', 'Cạn kiệt', '/rʌn aʊt əv/', 'We may ___ time.', 'B1', 'Chăm sóc|Ghé qua|Tắt'],
+    ['Turn On', 'Bật lên', '/tɝːn ɑːn/', 'Please ___ the light.', 'A2', 'Tắt đi|Từ bỏ|Gặp gỡ'],
+    ['Turn Off', 'Tắt đi', '/tɝːn ɔːf/', '___ your phone in class.', 'A2', 'Bật lên|Đón ai|Tra cứu'],
+    ['Pick Up', 'Đón ai đó', '/pɪk ʌp/', 'Can you ___ me at six?', 'A2', 'Từ bỏ|Hủy bỏ|Cạn kiệt'],
+    ['Put Off', 'Trì hoãn', '/pʊt ɔːf/', 'They ___ the meeting.', 'B1', 'Bắt đầu|Tăng giá|Nếm thử'],
+    ['Find Out', 'Tìm ra', '/faɪnd aʊt/', 'I want to ___ the truth.', 'B1', 'Bỏ cuộc|Tắt đi|Đặt bàn'],
+    ['Log In', 'Đăng nhập', '/lɔːɡ ɪn/', '___ with your password.', 'A2', 'Đăng xuất|Nấu ăn|Điều trị'],
+  ],
+  'idioms': [
+    ['Break The Ice', 'Phá vỡ sự ngại ngùng ban đầu', '/breɪk ði aɪs/', 'A joke can ___.', 'B1', 'Làm vỡ kính|Tắt đèn|Giảm giá'],
+    ['Piece Of Cake', 'Rất dễ', '/piːs əv keɪk/', 'The test was a ___.', 'B1', 'Món tráng miệng|Bài khó|Lịch trình'],
+    ['Once In A Blue Moon', 'Rất hiếm khi', '/wʌns ɪn ə bluː muːn/', 'He visits us ___.', 'B1', 'Mỗi ngày|Rất nhanh|Tốn kém'],
+    ['Hit The Books', 'Học chăm chỉ', '/hɪt ðə bʊks/', 'I need to ___ tonight.', 'B1', 'Đánh sách|Đi mua sắm|Nấu ăn'],
+    ['Under The Weather', 'Không khỏe', '/ˈʌn.dɚ ðə ˈweð.ɚ/', 'I feel ___.', 'B1', 'Dưới trời mưa|Rất vui|Đúng giờ'],
+    ['Call It A Day', 'Dừng làm việc trong ngày', '/kɔːl ɪt ə deɪ/', 'We should ___ and go home.', 'B1', 'Gọi điện|Bắt đầu học|Đi du lịch'],
+    ['On The Same Page', 'Cùng hiểu như nhau', '/ɑːn ðə seɪm peɪdʒ/', 'Make sure we are ___.', 'B2', 'Ở cùng trang giấy|Lạc đường|Đói bụng'],
+    ['Spill The Beans', 'Tiết lộ bí mật', '/spɪl ðə biːnz/', 'Do not ___ about the party.', 'B1', 'Làm đổ đậu|Nấu ăn|Tái chế'],
+    ['Keep An Eye On', 'Để mắt tới', '/kiːp ən aɪ ɑːn/', 'Please ___ my bag.', 'B1', 'Giữ một con mắt|Đóng cửa|Đặt bàn'],
+    ['Miss The Boat', 'Bỏ lỡ cơ hội', '/mɪs ðə boʊt/', 'Apply now or you may ___.', 'B2', 'Lỡ chuyến tàu|Đi du lịch|Bị bệnh'],
+  ],
+  'testprep': [
+    ['Analyze', 'Phân tích', '/ˈæn.əl.aɪz/', 'You should ___ the chart first.', 'B1', 'Nếm thử|Đặt bàn|Khởi động'],
+    ['Compare', 'So sánh', '/kəmˈper/', '___ the two opinions.', 'A2', 'Tái chế|Điều trị|Đổi hàng'],
+    ['Summarize', 'Tóm tắt', '/ˈsʌm.ə.raɪz/', 'Please ___ the passage.', 'B1', 'Nấu ăn|Hủy bỏ|Giao hàng'],
+    ['Evidence', 'Bằng chứng', '/ˈev.ə.dəns/', 'Use ___ to support your answer.', 'B1', 'Gia vị|Hành lý|Cơn sốt'],
+    ['Conclusion', 'Kết luận', '/kənˈkluː.ʒən/', 'Write a clear ___.', 'B1', 'Món chính|Mật khẩu|Đơn thuốc'],
+    ['Diagram', 'Sơ đồ', '/ˈdaɪ.ə.ɡræm/', 'Label the ___ carefully.', 'A2', 'Hóa đơn|Thực đơn|Lịch bay'],
+    ['Trend', 'Xu hướng', '/trend/', 'The graph shows an upward ___.', 'B1', 'Cơn ho|Học bổng|Bảo hành'],
+    ['Fluctuate', 'Dao động', '/ˈflʌk.tʃu.eɪt/', 'Prices may ___ during the year.', 'B2', 'Đăng nhập|Ăn tối|Khám bệnh'],
+    ['Accurate', 'Chính xác', '/ˈæk.jɚ.ət/', 'Make sure your answer is ___.', 'B1', 'Ngọt|Muộn|Đầy bụi'],
+    ['Inference', 'Suy luận', '/ˈɪn.fɚ.əns/', 'This question asks for an ___.', 'B2', 'Biên lai|Món phụ|Cảm xúc'],
+  ],
+};
+
+final vocabData = vocabRows.entries.expand((entry) {
+  return List.generate(entry.value.length, (index) {
+    final row = entry.value[index];
     return VocabWord(
-      id: '${topicId}_${index + 1}',
+      id: '${entry.key}_${index + 1}',
       word: row[0],
       meaning: row[1],
       pronunciation: row[2],
       example: row[3],
-      topicId: topicId,
+      topicId: entry.key,
       level: row[4],
       wrongOptions: row[5].split('|'),
     );
   });
-}
-
-final vocabData = <VocabWord>[
-  ...topicWords('everyday', [
-    ['Routine', 'Thói quen hằng ngày', '/ruːˈtiːn/', 'My daily ___ includes exercise and reading.', 'A2', 'Chuyến đi du lịch|Kế hoạch tài chính|Món ăn yêu thích'],
-    ['Neighbourhood', 'Khu xóm', '/ˈneɪ.bə.hʊd/', 'Our ___ is quiet and safe.', 'A2', 'Sân bay|Văn phòng|Nhà hàng'],
-    ['Appliance', 'Thiết bị gia dụng', '/əˈplaɪ.əns/', 'A refrigerator is a kitchen ___.', 'B1', 'Môn học|Phần mềm|Đồ uống'],
-    ['Leisure', 'Thời gian rảnh rỗi', '/ˈleʒ.ər/', 'Reading is my favorite ___ activity.', 'B1', 'Áp lực|Cuộc họp|Hóa đơn'],
-    ['Chore', 'Việc nhà lặt vặt', '/tʃɔːr/', 'Washing dishes is a household ___.', 'A2', 'Chuyến bay|Bài kiểm tra|Hợp đồng'],
-    ['Convenient', 'Tiện lợi', '/kənˈviː.ni.ənt/', 'Living near the station is ___.', 'A2', 'Đắt đỏ|Xa xôi|Phức tạp'],
-    ['Grateful', 'Biết ơn', '/ˈɡreɪt.fəl/', 'I am ___ for your help.', 'A2', 'Tức giận|Buồn ngủ|Ngạc nhiên'],
-    ['Punctual', 'Đúng giờ', '/ˈpʌŋk.tʃu.əl/', 'She is always ___ for meetings.', 'B1', 'Muộn màng|Lười biếng|Ồn ào'],
-    ['Commute', 'Đi lại hằng ngày', '/kəˈmjuːt/', 'My morning ___ takes thirty minutes.', 'B1', 'Bữa tối|Kỳ nghỉ|Mua sắm'],
-    ['Comfortable', 'Thoải mái', '/ˈkʌmf.tə.bəl/', 'This chair is very ___.', 'A1', 'Nguy hiểm|Đắng|Bận rộn'],
-  ]),
-  ...topicWords('school', [
-    ['Assignment', 'Bài tập được giao', '/əˈsaɪn.mənt/', 'The teacher gave us a new ___.', 'A2', 'Sân bay|Hóa đơn|Bữa ăn'],
-    ['Lecture', 'Bài giảng', '/ˈlek.tʃər/', 'The history ___ was interesting.', 'B1', 'Khách sạn|Triệu chứng|Hợp đồng'],
-    ['Scholarship', 'Học bổng', '/ˈskɒl.ə.ʃɪp/', 'She won a ___ to study abroad.', 'B1', 'Tiền phạt|Vé tàu|Đơn thuốc'],
-    ['Textbook', 'Sách giáo khoa', '/ˈtekst.bʊk/', 'Please open your ___ to page ten.', 'A1', 'Bàn chải|Vé máy bay|Hộ chiếu'],
-    ['Classmate', 'Bạn cùng lớp', '/ˈklɑːs.meɪt/', 'My ___ helped me with math.', 'A1', 'Khách hàng|Bác sĩ|Đầu bếp'],
-    ['Subject', 'Môn học', '/ˈsʌb.dʒekt/', 'English is my favorite ___.', 'A1', 'Hương vị|Thiết bị|Chuyến đi'],
-    ['Improve', 'Cải thiện', '/ɪmˈpruːv/', 'Practice can ___ your speaking.', 'A2', 'Hủy bỏ|Che giấu|Giảm giá'],
-    ['Attend', 'Tham dự', '/əˈtend/', 'Students must ___ the exam.', 'A2', 'Nấu ăn|Đặt phòng|Sửa chữa'],
-    ['Research', 'Nghiên cứu', '/rɪˈsɜːrtʃ/', 'We did ___ for our project.', 'B1', 'Giải trí|Tập thể dục|Mua hàng'],
-    ['Graduate', 'Tốt nghiệp', '/ˈɡrædʒ.u.eɪt/', 'He will ___ next year.', 'B1', 'Đặt bàn|Khởi động|Hoàn tiền'],
-  ]),
-  ...topicWords('work', [
-    ['Deadline', 'Hạn chót', '/ˈded.laɪn/', 'We must finish before the ___.', 'B1', 'Kỳ nghỉ|Triệu chứng|Món tráng miệng'],
-    ['Colleague', 'Đồng nghiệp', '/ˈkɒl.iːɡ/', 'My ___ sits next to me.', 'A2', 'Bạn cùng lớp|Hành khách|Bệnh nhân'],
-    ['Meeting', 'Cuộc họp', '/ˈmiː.tɪŋ/', 'The ___ starts at nine.', 'A1', 'Bữa sáng|Kỳ thi|Chuyến bay'],
-    ['Task', 'Nhiệm vụ', '/tɑːsk/', 'This ___ is important.', 'A2', 'Món ăn|Căn bệnh|Hóa đơn'],
-    ['Manager', 'Quản lý', '/ˈmæn.ɪ.dʒər/', 'The ___ approved the plan.', 'A2', 'Phi công|Y tá|Hướng dẫn viên'],
-    ['Salary', 'Lương', '/ˈsæl.ər.i/', 'Her ___ increased this year.', 'A2', 'Bài giảng|Hộ chiếu|Thành phần'],
-    ['Promotion', 'Sự thăng chức', '/prəˈməʊ.ʃən/', 'He got a ___ after two years.', 'B1', 'Sự hoãn chuyến|Cơn đau|Lời khuyên'],
-    ['Client', 'Khách hàng', '/ˈklaɪ.ənt/', 'The ___ requested a report.', 'B1', 'Giáo viên|Hành lý|Đầu bếp'],
-    ['Presentation', 'Bài thuyết trình', '/ˌprez.ənˈteɪ.ʃən/', 'Her ___ was clear and confident.', 'B1', 'Đơn thuốc|Món khai vị|Bài hát'],
-    ['Efficient', 'Hiệu quả', '/ɪˈfɪʃ.ənt/', 'This system is fast and ___.', 'B2', 'Ngon miệng|Đau đớn|Lạc đường'],
-  ]),
-  ...topicWords('travel', [
-    ['Destination', 'Điểm đến', '/ˌdes.tɪˈneɪ.ʃən/', 'Paris is our next ___.', 'A2', 'Hóa đơn|Triệu chứng|Từ điển'],
-    ['Luggage', 'Hành lý', '/ˈlʌɡ.ɪdʒ/', 'My ___ is very heavy.', 'A2', 'Bài tập|Đơn thuốc|Mức lương'],
-    ['Reservation', 'Sự đặt chỗ', '/ˌrez.əˈveɪ.ʃən/', 'I made a hotel ___.', 'B1', 'Sự thăng chức|Cơn đau|Món ăn'],
-    ['Boarding Pass', 'Thẻ lên máy bay', '/ˈbɔːr.dɪŋ pæs/', 'Show your ___ at the gate.', 'A2', 'Sách giáo khoa|Hóa đơn điện|Thực đơn'],
-    ['Itinerary', 'Lịch trình chuyến đi', '/aɪˈtɪn.ər.ər.i/', 'Our ___ includes three cities.', 'B1', 'Công thức nấu ăn|Bài kiểm tra|Hợp đồng'],
-    ['Departure', 'Sự khởi hành', '/dɪˈpɑːr.tʃər/', 'The ___ time is 7 a.m.', 'B1', 'Bữa trưa|Cuộc họp|Đơn hàng'],
-    ['Accommodation', 'Chỗ ở', '/əˌkɒm.əˈdeɪ.ʃən/', 'We found cheap ___.', 'B1', 'Bài giảng|Thiết bị|Triệu chứng'],
-    ['Tourist', 'Khách du lịch', '/ˈtʊə.rɪst/', 'The ___ asked for directions.', 'A1', 'Bệnh nhân|Quản lý|Đồng nghiệp'],
-    ['Journey', 'Hành trình', '/ˈdʒɜː.ni/', 'The train ___ was relaxing.', 'A2', 'Bài tập|Bữa ăn|Tin nhắn'],
-    ['Explore', 'Khám phá', '/ɪkˈsplɔːr/', 'We want to ___ the old town.', 'A2', 'In ấn|Nghỉ ốm|Thanh toán'],
-  ]),
-  ...topicWords('food', [
-    ['Ingredient', 'Nguyên liệu', '/ɪnˈɡriː.di.ənt/', 'Tomato is the main ___.', 'A2', 'Hành lý|Màn hình|Học bổng'],
-    ['Delicious', 'Ngon', '/dɪˈlɪʃ.əs/', 'This soup is ___.', 'A1', 'Đau|Đắt|Muộn'],
-    ['Appetizer', 'Món khai vị', '/ˈæp.ə.taɪ.zər/', 'We ordered an ___ first.', 'B1', 'Môn học|Hợp đồng|Cổng sân bay'],
-    ['Beverage', 'Đồ uống', '/ˈbev.ər.ɪdʒ/', 'Tea is a popular ___.', 'B1', 'Thiết bị|Nơi ở|Nhiệm vụ'],
-    ['Recipe', 'Công thức nấu ăn', '/ˈres.ɪ.pi/', 'I followed the ___ carefully.', 'A2', 'Lịch trình|Bài giảng|Đơn thuốc'],
-    ['Flavor', 'Hương vị', '/ˈfleɪ.vər/', 'The ___ is sweet and fresh.', 'A2', 'Mức lương|Địa chỉ|Triệu chứng'],
-    ['Spicy', 'Cay', '/ˈspaɪ.si/', 'This curry is too ___.', 'A1', 'Lạnh|Im lặng|Chính xác'],
-    ['Dessert', 'Món tráng miệng', '/dɪˈzɜːrt/', 'Ice cream is my favorite ___.', 'A1', 'Văn phòng|Bài tập|Hóa đơn'],
-    ['Menu', 'Thực đơn', '/ˈmen.juː/', 'Can I see the ___, please?', 'A1', 'Hộ chiếu|Bảng điểm|Kết quả'],
-    ['Nutritious', 'Bổ dưỡng', '/njuːˈtrɪʃ.əs/', 'Vegetables are very ___.', 'B1', 'Ồn ào|Rỗng|Xa xôi'],
-  ]),
-  ...topicWords('tech', [
-    ['Device', 'Thiết bị', '/dɪˈvaɪs/', 'A phone is a useful ___.', 'A2', 'Món ăn|Học bổng|Triệu chứng'],
-    ['Software', 'Phần mềm', '/ˈsɒft.weər/', 'This ___ helps us edit photos.', 'A2', 'Hành lý|Công thức|Đơn thuốc'],
-    ['Update', 'Cập nhật', '/ˌʌpˈdeɪt/', 'Please ___ the app regularly.', 'A2', 'Nấu|Khám|Đặt bàn'],
-    ['Password', 'Mật khẩu', '/ˈpɑːs.wɜːd/', 'Never share your ___.', 'A2', 'Hóa đơn|Món tráng miệng|Điểm đến'],
-    ['Download', 'Tải xuống', '/ˌdaʊnˈləʊd/', 'You can ___ the file now.', 'A1', 'Tham dự|Hủy|Bổ nhiệm'],
-    ['Connection', 'Kết nối', '/kəˈnek.ʃən/', 'The internet ___ is slow.', 'B1', 'Mùi vị|Cơn đau|Đường bay'],
-    ['Privacy', 'Quyền riêng tư', '/ˈprɪv.ə.si/', 'Online ___ is important.', 'B1', 'Khai vị|Đúng giờ|Học phí'],
-    ['Search Engine', 'Công cụ tìm kiếm', '/sɜːrtʃ ˈen.dʒɪn/', 'Google is a ___ .', 'A2', 'Sổ tay|Bệnh viện|Quầy lễ tân'],
-    ['Artificial Intelligence', 'Trí tuệ nhân tạo', '/ˌɑː.tɪˈfɪʃ.əl ɪnˈtel.ɪ.dʒəns/', '___ can support learning.', 'B2', 'Đồ uống nóng|Hành lý ký gửi|Việc nhà'],
-    ['Cybersecurity', 'An ninh mạng', '/ˌsaɪ.bə.sɪˈkjʊə.rə.ti/', 'Companies invest in ___.', 'B2', 'Ẩm thực|Thể dục|Du lịch'],
-  ]),
-  ...topicWords('health', [
-    ['Symptom', 'Triệu chứng', '/ˈsɪmp.təm/', 'Fever is a common ___.', 'A2', 'Hộ chiếu|Món ăn|Bài tập'],
-    ['Appointment', 'Cuộc hẹn', '/əˈpɔɪnt.mənt/', 'I have a doctor ___ tomorrow.', 'A2', 'Hợp đồng|Lịch bay|Công thức'],
-    ['Medicine', 'Thuốc', '/ˈmed.ɪ.sən/', 'Take this ___ twice a day.', 'A1', 'Vé tàu|Mức lương|Mật khẩu'],
-    ['Exercise', 'Tập thể dục', '/ˈek.sə.saɪz/', 'Regular ___ keeps you healthy.', 'A1', 'Bài giảng|Hành lý|Bữa ăn'],
-    ['Nutrition', 'Dinh dưỡng', '/njuːˈtrɪʃ.ən/', 'Good ___ supports growth.', 'B1', 'Du lịch|Tiếp thị|Nâng cấp'],
-    ['Recover', 'Phục hồi', '/rɪˈkʌv.ər/', 'She will ___ after rest.', 'B1', 'Tải xuống|Đặt phòng|Thuyết trình'],
-    ['Allergy', 'Dị ứng', '/ˈæl.ə.dʒi/', 'He has a peanut ___.', 'B1', 'Học bổng|Hợp đồng|Thiết bị'],
-    ['Treatment', 'Sự điều trị', '/ˈtriːt.mənt/', 'The ___ lasted two weeks.', 'B1', 'Món tráng miệng|Điểm đến|Bài tập'],
-    ['Healthy', 'Khỏe mạnh', '/ˈhel.θi/', 'A ___ diet is important.', 'A1', 'Cay|Muộn|Ẩn danh'],
-    ['Prevent', 'Ngăn ngừa', '/prɪˈvent/', 'Vaccines help ___ disease.', 'B1', 'Đặt chỗ|Tìm kiếm|Tốt nghiệp'],
-  ]),
-  ...topicWords('business', [
-    ['Revenue', 'Doanh thu', '/ˈrev.ən.juː/', 'The company increased its ___.', 'B2', 'Triệu chứng|Món khai vị|Hành lý'],
-    ['Contract', 'Hợp đồng', '/ˈkɒn.trækt/', 'Please read the ___ carefully.', 'B1', 'Công thức|Học bổng|Thẻ lên máy bay'],
-    ['Customer', 'Khách hàng', '/ˈkʌs.tə.mər/', 'A happy ___ may return.', 'A2', 'Bệnh nhân|Bạn cùng lớp|Phi công'],
-    ['Marketing', 'Tiếp thị', '/ˈmɑː.kɪ.tɪŋ/', 'Good ___ attracts buyers.', 'B1', 'Dinh dưỡng|Hành trình|Việc nhà'],
-    ['Negotiation', 'Sự đàm phán', '/nɪˌɡəʊ.ʃiˈeɪ.ʃən/', 'The ___ took two hours.', 'B2', 'Món tráng miệng|Cuộc hẹn|Từ điển'],
-    ['Investment', 'Khoản đầu tư', '/ɪnˈvest.mənt/', 'This ___ may bring profit.', 'B2', 'Đồ uống|Bài kiểm tra|Căn hộ'],
-    ['Profit', 'Lợi nhuận', '/ˈprɒf.ɪt/', 'The shop made a good ___.', 'B1', 'Mật khẩu|Cơn sốt|Bảng điểm'],
-    ['Strategy', 'Chiến lược', '/ˈstræt.ə.dʒi/', 'We need a new sales ___.', 'B2', 'Hương vị|Triệu chứng|Hành lý'],
-    ['Invoice', 'Hóa đơn', '/ˈɪn.vɔɪs/', 'The ___ shows the total price.', 'B1', 'Hộ chiếu|Bài giảng|Đơn thuốc'],
-    ['Launch', 'Ra mắt sản phẩm', '/lɔːntʃ/', 'We will ___ the app next month.', 'B1', 'Nghỉ ngơi|Khám bệnh|Rửa bát'],
-  ]),
-];
+}).toList();
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key, required this.onThemeChanged});
@@ -381,7 +494,7 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  static const progressKey = 'quiz_vocab_progress_v2';
+  static const progressKey = 'quiz_vocab_progress_v3';
   static const soundKey = 'quiz_vocab_sound';
   static const autoSpeakKey = 'quiz_vocab_auto_speak';
   static const darkModeKey = 'quiz_vocab_dark_mode';
@@ -393,6 +506,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool darkMode = false;
   int selectedIndex = 0;
   List<QuizQuestion>? activeQuestions;
+  String activeTopicId = 'general';
   String activeTopicTitle = 'Quiz Vocab';
   QuizResultData? lastResult;
   final FlutterTts tts = FlutterTts();
@@ -448,60 +562,85 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   List<QuizQuestion> _generateQuestions(List<VocabWord> words) {
     final random = Random();
-    final selectedWords = [...words]..shuffle(random);
+    final pairs = <MapEntry<VocabWord, QuestionType>>[];
+    final shuffledWords = [...words]..shuffle(random);
+    for (final word in shuffledWords) {
+      for (final type in QuestionType.values) {
+        pairs.add(MapEntry(word, type));
+      }
+    }
+    pairs.shuffle(random);
+    return pairs.take(min(20, pairs.length)).toList().asMap().entries.map((entry) {
+      return _questionFromPair(entry.value.key, entry.value.value, entry.key, random);
+    }).toList();
+  }
+
+  QuizQuestion _questionFromPair(VocabWord word, QuestionType type, int index, Random random) {
     final pool = [...vocabData]..shuffle(random);
-    return selectedWords.take(10).toList().asMap().entries.map((entry) {
-      final index = entry.key;
-      final word = entry.value;
-      final type = QuestionType.values[index % QuestionType.values.length];
+    final fullSentence = word.example.replaceAll('___', word.word);
+    final blankSentence = word.example.contains('___') ? word.example : word.example.replaceAll(RegExp(word.word, caseSensitive: false), '___');
 
-      if (type == QuestionType.enToVi) {
-        final wrong = word.wrongOptions.take(3).toList();
-        final options = [word.meaning, ...wrong]..shuffle(random);
-        return QuizQuestion(
-          id: '${word.id}_$index',
-          word: word,
-          type: type,
-          prompt: 'Nghĩa tiếng Việt của "${word.word}" là gì?',
-          subPrompt: word.pronunciation,
-          options: options,
-          correctAnswer: word.meaning,
-          explanation: '"${word.word}" có nghĩa là "${word.meaning}". Ví dụ: ${word.example.replaceAll('___', word.word)}',
-        );
-      }
-
-      if (type == QuestionType.viToEn) {
-        final wrong = pool.where((item) => item.id != word.id).map((e) => e.word).take(3).toList();
-        final options = [word.word, ...wrong]..shuffle(random);
-        return QuizQuestion(
-          id: '${word.id}_$index',
-          word: word,
-          type: type,
-          prompt: 'Từ tiếng Anh nào mang nghĩa "${word.meaning}"?',
-          options: options,
-          correctAnswer: word.word,
-          explanation: '"${word.meaning}" trong tiếng Anh là "${word.word}" ${word.pronunciation}.',
-        );
-      }
-
-      final wrong = pool.where((item) => item.id != word.id).map((e) => e.word).take(3).toList();
-      final options = [word.word, ...wrong]..shuffle(random);
+    if (type == QuestionType.meaning || type == QuestionType.context) {
+      final options = _makeOptions(word.meaning, word.wrongOptions, random);
       return QuizQuestion(
-        id: '${word.id}_$index',
+        id: '${word.id}_${type.name}_$index',
         word: word,
         type: type,
-        prompt: 'Chọn từ phù hợp để điền vào chỗ trống:',
-        subPrompt: word.example.contains('___') ? word.example : word.example.replaceAll(RegExp(word.word, caseSensitive: false), '___'),
+        prompt: type == QuestionType.meaning ? 'Nghĩa tiếng Việt của "${word.word}" là gì?' : 'Trong câu dưới đây, "${word.word}" mang nghĩa gì?',
+        subPrompt: type == QuestionType.meaning ? word.pronunciation : fullSentence,
+        options: options,
+        correctAnswer: word.meaning,
+        explanation: '"${word.word}" có nghĩa là "${word.meaning}". Ví dụ: $fullSentence',
+      );
+    }
+
+    if (type == QuestionType.reverse || type == QuestionType.pronunciation) {
+      final wrong = pool.where((item) => item.id != word.id).map((item) => item.word);
+      final options = _makeOptions(word.word, wrong, random);
+      return QuizQuestion(
+        id: '${word.id}_${type.name}_$index',
+        word: word,
+        type: type,
+        prompt: type == QuestionType.reverse ? 'Từ tiếng Anh nào mang nghĩa "${word.meaning}"?' : 'Từ nào có phiên âm ${word.pronunciation}?',
+        subPrompt: type == QuestionType.pronunciation ? 'Gợi ý nghĩa: ${word.meaning}' : null,
         options: options,
         correctAnswer: word.word,
-        explanation: 'Câu hoàn chỉnh: ${word.example.replaceAll('___', word.word)}',
+        explanation: '"${word.meaning}" trong tiếng Anh là "${word.word}" ${word.pronunciation}.',
       );
-    }).toList();
+    }
+
+    final wrong = pool.where((item) => item.id != word.id).map((item) => item.word);
+    final options = _makeOptions(word.word, wrong, random);
+    return QuizQuestion(
+      id: '${word.id}_${type.name}_$index',
+      word: word,
+      type: type,
+      prompt: 'Chọn từ phù hợp để điền vào chỗ trống:',
+      subPrompt: blankSentence,
+      options: options,
+      correctAnswer: word.word,
+      explanation: 'Câu hoàn chỉnh: $fullSentence',
+    );
+  }
+
+  List<String> _makeOptions(String correct, Iterable<String> wrongPool, Random random) {
+    final options = <String>[correct];
+    for (final option in wrongPool) {
+      if (option.trim().isEmpty || option == correct || options.contains(option)) continue;
+      options.add(option);
+      if (options.length == 4) break;
+    }
+    while (options.length < 4) {
+      options.add('Đáp án khác ${options.length}');
+    }
+    options.shuffle(random);
+    return options;
   }
 
   void _startTopicQuiz(Topic topic) {
     final words = vocabData.where((word) => word.topicId == topic.id).toList();
     setState(() {
+      activeTopicId = topic.id;
       activeTopicTitle = '${topic.title} - ${topic.titleVi}';
       activeQuestions = _generateQuestions(words);
       lastResult = null;
@@ -510,10 +649,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _startWrongWordsQuiz() {
-    final wrongIds = progress.wrongWords.map((e) => e.wordId).toSet();
+    final wrongIds = progress.wrongWords.map((record) => record.wordId).toSet();
     final words = vocabData.where((word) => wrongIds.contains(word.id)).toList();
     if (words.isEmpty) return;
     setState(() {
+      activeTopicId = 'wrong_review';
       activeTopicTitle = 'Ôn tập từ sai';
       activeQuestions = _generateQuestions(words);
       lastResult = null;
@@ -529,86 +669,86 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     progress.totalCorrect += correctCount;
     progress.totalQuestions += total;
     progress.highScore = max(progress.highScore, percent);
-    progress.lastActiveDate = todayString();
 
     final stat = progress.topicStats.putIfAbsent(topicId, () => TopicStat());
     stat.completedCount += 1;
     stat.highestScore = max(stat.highestScore, percent);
 
     for (final word in wrongWords) {
-      final existing = progress.wrongWords.where((record) => record.wordId == word.id).firstOrNull;
-      if (existing == null) {
+      final existing = progress.wrongWords.where((record) => record.wordId == word.id).toList();
+      if (existing.isEmpty) {
         progress.wrongWords.add(WrongWordRecord(wordId: word.id, wrongCount: 1, lastWrongAt: DateTime.now().toIso8601String()));
       } else {
-        existing.wrongCount += 1;
-        existing.lastWrongAt = DateTime.now().toIso8601String();
+        existing.first.wrongCount += 1;
+        existing.first.lastWrongAt = DateTime.now().toIso8601String();
       }
     }
 
-    await _saveProgress();
+    final result = QuizResultData(
+      topicId: topicId,
+      topicTitle: activeTopicTitle,
+      correctCount: correctCount,
+      totalQuestions: total,
+      wrongWords: wrongWords,
+      percent: percent,
+    );
+
     setState(() {
-      lastResult = QuizResultData(
-        correctCount: correctCount,
-        totalQuestions: total,
-        wrongWords: wrongWords,
-        percent: percent,
-      );
+      progress = progress;
+      lastResult = result;
     });
+    await _saveProgress();
   }
 
-  Future<void> _removeWrongWord(String id) async {
-    setState(() => progress.wrongWords.removeWhere((record) => record.wordId == id));
+  Future<void> _removeWrongWord(String wordId) async {
+    setState(() => progress.wrongWords.removeWhere((record) => record.wordId == wordId));
     await _saveProgress();
   }
 
   Future<void> _resetProgress() async {
-    setState(() => progress = UserProgress());
+    setState(() {
+      progress = UserProgress();
+      activeQuestions = null;
+      lastResult = null;
+    });
     await _saveProgress();
   }
 
-  Future<void> _speak(String word) async {
+  Future<void> _speak(String text) async {
     if (!soundEnabled) return;
     await tts.stop();
-    await tts.speak(word);
+    await tts.speak(text);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (prefs == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    final screens = [
+    final screens = <Widget>[
       HomeScreen(
         progress: progress,
         onStartLearning: () => setState(() => selectedIndex = 1),
         onViewProgress: () => setState(() => selectedIndex = 3),
       ),
       activeQuestions == null
-          ? TopicsScreen(progress: progress, onStartTopic: _startTopicQuiz)
+          ? TopicsScreen(progress: progress, onSelectTopic: _startTopicQuiz)
           : lastResult == null
               ? QuizScreen(
-                  title: activeTopicTitle,
+                  topicTitle: activeTopicTitle,
                   questions: activeQuestions!,
-                  autoSpeak: autoSpeak,
                   soundEnabled: soundEnabled,
+                  autoSpeak: autoSpeak,
                   onSpeak: _speak,
-                  onExit: () => setState(() {
-                    activeQuestions = null;
-                    lastResult = null;
-                  }),
-                  onFinish: (correct, wrong) => _finishQuiz(
-                    activeQuestions!.isNotEmpty ? activeQuestions!.first.word.topicId : 'general',
-                    correct,
-                    wrong,
-                  ),
+                  onExit: () => setState(() => activeQuestions = null),
+                  onFinish: (correct, wrong) => _finishQuiz(activeTopicId, correct, wrong),
                 )
               : ResultScreen(
                   result: lastResult!,
                   onRetry: () {
-                    final first = activeQuestions?.first.word.topicId;
-                    final topic = topics.where((t) => t.id == first).firstOrNull;
-                    if (topic != null) _startTopicQuiz(topic);
+                    final topic = topics.where((item) => item.id == lastResult!.topicId).toList();
+                    if (topic.isEmpty) {
+                      _startWrongWordsQuiz();
+                    } else {
+                      _startTopicQuiz(topic.first);
+                    }
                   },
                   onOtherTopic: () => setState(() {
                     activeQuestions = null;
@@ -620,11 +760,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     selectedIndex = 2;
                   }),
                 ),
-      WrongWordsScreen(
-        records: progress.wrongWords,
-        onRemove: _removeWrongWord,
-        onStartQuiz: _startWrongWordsQuiz,
-      ),
+      WrongWordsScreen(records: progress.wrongWords, onRemove: _removeWrongWord, onStartQuiz: _startWrongWordsQuiz),
       ProgressScreen(progress: progress),
       SettingsScreen(
         soundEnabled: soundEnabled,
@@ -650,7 +786,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quiz Vocab', style: TextStyle(fontWeight: FontWeight.w900)),
-        centerTitle: false,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -661,10 +796,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
         ],
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: screens[selectedIndex],
-      ),
+      body: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: screens[selectedIndex]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) {
@@ -676,34 +808,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             }
           });
         },
-        destinations: [
-          const NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Trang chủ'),
-          const NavigationDestination(icon: Icon(Icons.quiz_rounded), label: 'Quiz'),
-          NavigationDestination(icon: Badge(label: Text('${progress.wrongWords.length}'), child: const Icon(Icons.replay_rounded)), label: 'Từ sai'),
-          const NavigationDestination(icon: Icon(Icons.bar_chart_rounded), label: 'Tiến độ'),
-          const NavigationDestination(icon: Icon(Icons.settings_rounded), label: 'Cài đặt'),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Trang chủ'),
+          NavigationDestination(icon: Icon(Icons.quiz_rounded), label: 'Quiz'),
+          NavigationDestination(icon: Icon(Icons.replay_rounded), label: 'Từ sai'),
+          NavigationDestination(icon: Icon(Icons.bar_chart_rounded), label: 'Tiến độ'),
+          NavigationDestination(icon: Icon(Icons.settings_rounded), label: 'Cài đặt'),
         ],
       ),
     );
   }
-}
-
-class QuizResultData {
-  const QuizResultData({
-    required this.correctCount,
-    required this.totalQuestions,
-    required this.wrongWords,
-    required this.percent,
-  });
-
-  final int correctCount;
-  final int totalQuestions;
-  final List<VocabWord> wrongWords;
-  final int percent;
-}
-
-extension IterableFirstOrNull<E> on Iterable<E> {
-  E? get firstOrNull => isEmpty ? null : first;
 }
 
 class HomeScreen extends StatelessWidget {
@@ -736,7 +850,7 @@ class HomeScreen extends StatelessWidget {
               SizedBox(height: 16),
               Text('Học từ vựng thông minh', style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w900)),
               SizedBox(height: 8),
-              Text('Làm quiz, ghi nhớ từ sai và theo dõi tiến độ mỗi ngày.', style: TextStyle(color: Colors.white70, fontSize: 15)),
+              Text('16 chủ đề, 160 từ vựng và 5 kiểu câu hỏi để luyện hằng ngày.', style: TextStyle(color: Colors.white70, fontSize: 15)),
             ],
           ),
         ),
@@ -748,50 +862,77 @@ class HomeScreen extends StatelessWidget {
             Expanded(child: StatCard(title: 'Độ chính xác', value: '${(progress.accuracy * 100).round()}%', icon: Icons.check_circle_rounded)),
           ],
         ),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: onStartLearning,
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Bắt đầu học'),
-        ),
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: onViewProgress,
-          icon: const Icon(Icons.bar_chart_rounded),
-          label: const Text('Xem tiến độ'),
+        Row(
+          children: [
+            Expanded(child: StatCard(title: 'Chủ đề', value: '${topics.length}', icon: Icons.category_rounded)),
+            const SizedBox(width: 12),
+            Expanded(child: StatCard(title: 'Từ vựng', value: '${vocabData.length}', icon: Icons.translate_rounded)),
+          ],
         ),
+        const SizedBox(height: 20),
+        FilledButton.icon(onPressed: onStartLearning, icon: const Icon(Icons.play_arrow_rounded), label: const Text('Bắt đầu học')),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(onPressed: onViewProgress, icon: const Icon(Icons.bar_chart_rounded), label: const Text('Xem tiến độ')),
       ],
     );
   }
 }
 
-class TopicsScreen extends StatelessWidget {
-  const TopicsScreen({super.key, required this.progress, required this.onStartTopic});
+class StatCard extends StatelessWidget {
+  const StatCard({super.key, required this.title, required this.value, required this.icon});
 
-  final UserProgress progress;
-  final ValueChanged<Topic> onStartTopic;
+  final String title;
+  final String value;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 12),
+            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+            Text(title, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class TopicsScreen extends StatelessWidget {
+  const TopicsScreen({super.key, required this.progress, required this.onSelectTopic});
+
+  final UserProgress progress;
+  final ValueChanged<Topic> onSelectTopic;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(18),
       itemCount: topics.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final topic = topics[index];
+        final count = vocabData.where((word) => word.topicId == topic.id).length;
         final stat = progress.topicStats[topic.id];
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            contentPadding: const EdgeInsets.all(18),
+            contentPadding: const EdgeInsets.all(16),
             leading: CircleAvatar(child: Icon(topic.icon)),
             title: Text('${topic.title} • ${topic.titleVi}', style: const TextStyle(fontWeight: FontWeight.w800)),
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text('${topic.description}\n10 câu • ${topic.level}${stat == null ? '' : ' • Điểm cao: ${stat.highestScore}%'}'),
+              child: Text('${topic.description}\n$count từ • tối đa 20 câu/lượt • ${topic.level}${stat == null ? '' : '\nĐã học ${stat.completedCount} lần • cao nhất ${stat.highestScore}%'}'),
             ),
             isThreeLine: true,
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => onStartTopic(topic),
+            onTap: () => onSelectTopic(topic),
           ),
         );
       },
@@ -802,19 +943,19 @@ class TopicsScreen extends StatelessWidget {
 class QuizScreen extends StatefulWidget {
   const QuizScreen({
     super.key,
-    required this.title,
+    required this.topicTitle,
     required this.questions,
-    required this.autoSpeak,
     required this.soundEnabled,
+    required this.autoSpeak,
     required this.onSpeak,
     required this.onExit,
     required this.onFinish,
   });
 
-  final String title;
+  final String topicTitle;
   final List<QuizQuestion> questions;
-  final bool autoSpeak;
   final bool soundEnabled;
+  final bool autoSpeak;
   final ValueChanged<String> onSpeak;
   final VoidCallback onExit;
   final void Function(int correctCount, List<VocabWord> wrongWords) onFinish;
@@ -824,13 +965,13 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  int index = 0;
-  int correctCount = 0;
+  int currentIndex = 0;
+  int score = 0;
   String? selected;
   bool answered = false;
   final wrongWords = <VocabWord>[];
 
-  QuizQuestion get question => widget.questions[index];
+  QuizQuestion get current => widget.questions[currentIndex];
 
   @override
   void initState() {
@@ -839,33 +980,32 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _autoSpeak() {
-    if (widget.autoSpeak && widget.soundEnabled) {
-      widget.onSpeak(question.word.word);
+    if (widget.soundEnabled && widget.autoSpeak) {
+      widget.onSpeak(current.word.word);
     }
   }
 
-  void _choose(String option) {
+  void _answer(String option) {
     if (answered) return;
-    final isCorrect = option == question.correctAnswer;
-    HapticFeedback.selectionClick();
+    final isCorrect = option == current.correctAnswer;
     setState(() {
       selected = option;
       answered = true;
       if (isCorrect) {
-        correctCount += 1;
+        score += 1;
       } else {
-        wrongWords.add(question.word);
+        wrongWords.add(current.word);
       }
     });
   }
 
   void _next() {
-    if (index + 1 >= widget.questions.length) {
-      widget.onFinish(correctCount, wrongWords);
+    if (currentIndex + 1 >= widget.questions.length) {
+      widget.onFinish(score, wrongWords);
       return;
     }
     setState(() {
-      index += 1;
+      currentIndex += 1;
       selected = null;
       answered = false;
     });
@@ -874,64 +1014,75 @@ class _QuizScreenState extends State<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (index + 1) / widget.questions.length;
+    final progress = (currentIndex + 1) / widget.questions.length;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       children: [
         Row(
           children: [
-            IconButton(onPressed: widget.onExit, icon: const Icon(Icons.arrow_back_rounded)),
-            Expanded(child: Text(widget.title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800))),
-            Chip(label: Text('$correctCount đúng')),
+            IconButton(onPressed: widget.onExit, icon: const Icon(Icons.close_rounded)),
+            Expanded(child: Text(widget.topicTitle, style: const TextStyle(fontWeight: FontWeight.w800), textAlign: TextAlign.center)),
+            Chip(label: Text('$score/${widget.questions.length}')),
           ],
         ),
         const SizedBox(height: 8),
-        LinearProgressIndicator(value: progress, minHeight: 10, borderRadius: BorderRadius.circular(99)),
-        const SizedBox(height: 18),
+        LinearProgressIndicator(value: progress),
+        const SizedBox(height: 16),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(22),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Câu ${index + 1}/${widget.questions.length}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w800)),
+                Text('Câu ${currentIndex + 1}/${widget.questions.length}', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 12),
-                Text(question.prompt, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                if (question.subPrompt != null) ...[
+                Text(current.prompt, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                if (current.subPrompt != null) ...[
                   const SizedBox(height: 12),
-                  Text(question.subPrompt!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(current.subPrompt!, style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer)),
+                  ),
                 ],
                 const SizedBox(height: 12),
-                TextButton.icon(onPressed: () => widget.onSpeak(question.word.word), icon: const Icon(Icons.volume_up_rounded), label: const Text('Nghe phát âm')),
+                OutlinedButton.icon(
+                  onPressed: () => widget.onSpeak(current.word.word),
+                  icon: const Icon(Icons.volume_up_rounded),
+                  label: const Text('Nghe phát âm'),
+                ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        for (final option in question.options)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: AnswerButton(
-              option: option,
-              selected: selected == option,
-              isCorrect: option == question.correctAnswer,
-              answered: answered,
-              onTap: () => _choose(option),
-            ),
+        const SizedBox(height: 12),
+        for (final option in current.options) ...[
+          AnswerButton(
+            option: option,
+            answered: answered,
+            selected: selected == option,
+            correct: option == current.correctAnswer,
+            onPressed: () => _answer(option),
           ),
+          const SizedBox(height: 10),
+        ],
         if (answered) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Card(
-            color: Theme.of(context).colorScheme.primaryContainer,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(question.explanation ?? '', style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer)),
+              child: Text(current.explanation ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _next,
-            icon: Icon(index + 1 == widget.questions.length ? Icons.flag_rounded : Icons.arrow_forward_rounded),
-            label: Text(index + 1 == widget.questions.length ? 'Xem kết quả' : 'Câu tiếp theo'),
+            icon: const Icon(Icons.arrow_forward_rounded),
+            label: Text(currentIndex + 1 == widget.questions.length ? 'Xem kết quả' : 'Câu tiếp theo'),
           ),
         ],
       ],
@@ -943,45 +1094,47 @@ class AnswerButton extends StatelessWidget {
   const AnswerButton({
     super.key,
     required this.option,
-    required this.selected,
-    required this.isCorrect,
     required this.answered,
-    required this.onTap,
+    required this.selected,
+    required this.correct,
+    required this.onPressed,
   });
 
   final String option;
-  final bool selected;
-  final bool isCorrect;
   final bool answered;
-  final VoidCallback onTap;
+  final bool selected;
+  final bool correct;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    Color? color;
+    Color? background;
     IconData? icon;
-    if (answered && isCorrect) {
-      color = Colors.green.withOpacity(0.16);
+    if (answered && correct) {
+      background = Colors.green.shade100;
       icon = Icons.check_circle_rounded;
-    } else if (answered && selected && !isCorrect) {
-      color = Colors.red.withOpacity(0.16);
+    } else if (answered && selected && !correct) {
+      background = Colors.red.shade100;
       icon = Icons.cancel_rounded;
     }
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: answered ? null : onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color ?? Theme.of(context).cardColor,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      child: Material(
+        color: background ?? Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor),
-        ),
-        child: Row(
-          children: [
-            Expanded(child: Text(option, style: const TextStyle(fontWeight: FontWeight.w800))),
-            if (icon != null) Icon(icon, color: isCorrect ? Colors.green : Colors.red),
-          ],
+          onTap: answered ? null : onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              children: [
+                Expanded(child: Text(option, style: const TextStyle(fontWeight: FontWeight.w800))),
+                if (icon != null) Icon(icon, color: correct ? Colors.green : Colors.red),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1002,23 +1155,39 @@ class ResultScreen extends StatelessWidget {
   final VoidCallback onOtherTopic;
   final VoidCallback onWrongWords;
 
-  String get rating => result.percent >= 90 ? 'Xuất sắc' : result.percent >= 70 ? 'Tốt' : 'Cần luyện thêm';
+  String get rating {
+    if (result.percent >= 85) return 'Xuất sắc';
+    if (result.percent >= 60) return 'Tốt';
+    return 'Cần luyện thêm';
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       children: [
-        const Icon(Icons.emoji_events_rounded, size: 84, color: Colors.amber),
-        const SizedBox(height: 14),
-        Text(rating, textAlign: TextAlign.center, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
-        Text('${result.correctCount}/${result.totalQuestions} câu đúng • ${result.percent}%', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
-        const SizedBox(height: 24),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Icon(Icons.emoji_events_rounded, size: 72, color: Colors.amber),
+                const SizedBox(height: 16),
+                Text(rating, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                Text(result.topicTitle, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                Text('${result.correctCount}/${result.totalQuestions} đúng • ${result.percent}%', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                Text('Từ sai: ${result.wrongWords.length}'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Làm lại')),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(onPressed: onOtherTopic, icon: const Icon(Icons.grid_view_rounded), label: const Text('Chọn chủ đề khác')),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(onPressed: onOtherTopic, icon: const Icon(Icons.category_rounded), label: const Text('Chọn chủ đề khác')),
+        const SizedBox(height: 10),
         OutlinedButton.icon(onPressed: onWrongWords, icon: const Icon(Icons.replay_rounded), label: const Text('Xem từ sai')),
       ],
     );
@@ -1039,28 +1208,27 @@ class WrongWordsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final words = records
-        .map((record) => MapEntry(record, vocabData.where((word) => word.id == record.wordId).firstOrNull))
-        .where((entry) => entry.value != null)
-        .toList();
+    final words = records.map((record) {
+      final found = vocabData.where((word) => word.id == record.wordId).toList();
+      return MapEntry(record, found.isEmpty ? null : found.first);
+    }).where((entry) => entry.value != null).toList();
 
     if (words.isEmpty) {
-      return const EmptyState(icon: Icons.replay_rounded, title: 'Chưa có từ sai', subtitle: 'Làm quiz để hệ thống ghi nhớ các từ cần ôn lại.');
+      return const Center(child: Text('Chưa có từ sai. Hãy làm quiz để bắt đầu ôn tập.'));
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       children: [
-        FilledButton.icon(onPressed: onStartQuiz, icon: const Icon(Icons.play_arrow_rounded), label: const Text('Ôn tập từ sai')),
+        FilledButton.icon(onPressed: onStartQuiz, icon: const Icon(Icons.play_arrow_rounded), label: const Text('Làm quiz từ sai')),
         const SizedBox(height: 12),
         for (final entry in words)
           Card(
-            margin: const EdgeInsets.only(bottom: 10),
             child: ListTile(
               title: Text(entry.value!.word, style: const TextStyle(fontWeight: FontWeight.w900)),
               subtitle: Text('${entry.value!.meaning}\nSai ${entry.key.wrongCount} lần'),
               isThreeLine: true,
-              trailing: IconButton(onPressed: () => onRemove(entry.key.wordId), icon: const Icon(Icons.close_rounded)),
+              trailing: IconButton(onPressed: () => onRemove(entry.key.wordId), icon: const Icon(Icons.delete_outline_rounded)),
             ),
           ),
       ],
@@ -1075,8 +1243,9 @@ class ProgressScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sortedTopics = [...topics];
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       children: [
         Row(
           children: [
@@ -1088,21 +1257,20 @@ class ProgressScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: StatCard(title: 'Câu đúng', value: '${progress.totalCorrect}', icon: Icons.check_rounded)),
+            Expanded(child: StatCard(title: 'Câu đúng', value: '${progress.totalCorrect}', icon: Icons.check_circle_rounded)),
             const SizedBox(width: 12),
-            Expanded(child: StatCard(title: 'Streak', value: '${progress.streakDays}', icon: Icons.local_fire_department_rounded)),
+            Expanded(child: StatCard(title: 'Từ sai', value: '${progress.wrongWords.length}', icon: Icons.replay_rounded)),
           ],
         ),
         const SizedBox(height: 20),
-        Text('Tiến độ theo chủ đề', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
-        const SizedBox(height: 10),
-        for (final topic in topics)
+        const Text('Tiến độ theo chủ đề', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        for (final topic in sortedTopics)
           Card(
-            margin: const EdgeInsets.only(bottom: 10),
             child: ListTile(
               leading: Icon(topic.icon),
-              title: Text(topic.titleVi, style: const TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text('Đã làm: ${progress.topicStats[topic.id]?.completedCount ?? 0} lần'),
+              title: Text(topic.titleVi),
+              subtitle: Text('Đã học: ${progress.topicStats[topic.id]?.completedCount ?? 0} lần'),
               trailing: Text('${progress.topicStats[topic.id]?.highestScore ?? 0}%'),
             ),
           ),
@@ -1129,23 +1297,23 @@ class SettingsScreen extends StatelessWidget {
   final ValueChanged<bool> onSoundChanged;
   final ValueChanged<bool> onAutoSpeakChanged;
   final ValueChanged<bool> onDarkModeChanged;
-  final Future<void> Function() onResetProgress;
+  final VoidCallback onResetProgress;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       children: [
         SwitchListTile(
           value: soundEnabled,
           onChanged: onSoundChanged,
-          title: const Text('Bật âm thanh'),
+          title: const Text('Bật âm thanh/phát âm'),
           secondary: const Icon(Icons.volume_up_rounded),
         ),
         SwitchListTile(
           value: autoSpeak,
           onChanged: onAutoSpeakChanged,
-          title: const Text('Tự đọc từ khi vào câu hỏi'),
+          title: const Text('Tự đọc từ khi sang câu mới'),
           secondary: const Icon(Icons.record_voice_over_rounded),
         ),
         SwitchListTile(
@@ -1158,107 +1326,29 @@ class SettingsScreen extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.privacy_tip_rounded),
           title: const Text('Chính sách quyền riêng tư'),
-          subtitle: const Text('App lưu dữ liệu học tập offline trên thiết bị và không thu thập dữ liệu cá nhân.'),
-          onTap: () => showDialog(context: context, builder: (_) => const PrivacyPolicyDialog()),
+          subtitle: const Text('App không thu thập dữ liệu cá nhân. Tiến độ lưu trên thiết bị.'),
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Privacy Policy'),
+              content: const SingleChildScrollView(
+                child: Text('Quiz Vocab hoạt động offline, không yêu cầu đăng nhập, không thu thập tên, email, vị trí, danh bạ, ảnh hoặc dữ liệu cá nhân. Điểm số, streak và danh sách từ sai chỉ được lưu cục bộ trên thiết bị bằng SharedPreferences. Người dùng có thể xóa dữ liệu bằng nút Reset tiến độ hoặc gỡ ứng dụng.'),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đã hiểu')),
+              ],
+            ),
+          ),
         ),
         ListTile(
-          leading: const Icon(Icons.info_rounded),
-          title: const Text('Phiên bản'),
-          subtitle: const Text('1.0.0+1'),
+          leading: const Icon(Icons.restart_alt_rounded),
+          title: const Text('Reset tiến độ'),
+          subtitle: const Text('Xóa điểm, streak và danh sách từ sai'),
+          onTap: onResetProgress,
         ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () async {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: const Text('Reset tiến độ?'),
-                content: const Text('Thao tác này sẽ xóa điểm số, streak và danh sách từ sai trên thiết bị.'),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
-                  FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset')),
-                ],
-              ),
-            );
-            if (confirmed == true) await onResetProgress();
-          },
-          icon: const Icon(Icons.delete_outline_rounded),
-          label: const Text('Reset tiến độ'),
-        ),
+        const SizedBox(height: 20),
+        const Center(child: Text('Quiz Vocab v1.1.0 • 16 chủ đề • 160 từ vựng')),
       ],
-    );
-  }
-}
-
-class PrivacyPolicyDialog extends StatelessWidget {
-  const PrivacyPolicyDialog({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Chính sách quyền riêng tư'),
-      content: const SingleChildScrollView(
-        child: Text(
-          'Quiz Vocab hoạt động offline và không yêu cầu đăng nhập. Ứng dụng không thu thập tên, email, vị trí, danh bạ, ảnh hoặc dữ liệu cá nhân khác.\n\n'
-          'Các dữ liệu như điểm số, streak, chủ đề đã học và danh sách từ sai chỉ được lưu cục bộ trên thiết bị bằng SharedPreferences. Người dùng có thể xóa dữ liệu này bằng chức năng Reset tiến độ hoặc bằng cách gỡ ứng dụng.\n\n'
-          'Ứng dụng không hiển thị quảng cáo, không bán dữ liệu và không chia sẻ dữ liệu với bên thứ ba.',
-        ),
-      ),
-      actions: [
-        FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Đã hiểu')),
-      ],
-    );
-  }
-}
-
-class StatCard extends StatelessWidget {
-  const StatCard({super.key, required this.title, required this.value, required this.icon});
-
-  final String title;
-  final String value;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, size: 32, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 10),
-            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
-            Text(title, textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class EmptyState extends StatelessWidget {
-  const EmptyState({super.key, required this.icon, required this.title, required this.subtitle});
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 72, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 8),
-            Text(subtitle, textAlign: TextAlign.center),
-          ],
-        ),
-      ),
     );
   }
 }
