@@ -6,9 +6,10 @@ Quiz Vocab là ứng dụng Flutter học từ vựng tiếng Anh qua câu hỏi
 
 ## Tính năng
 
-- 8 chủ đề từ vựng: Everyday Life, School, Work, Travel, Food, Technology, Health, Business English
-- 80 từ vựng mẫu chia đều theo chủ đề
-- 3 dạng câu hỏi: Anh → Việt, Việt → Anh, điền từ vào câu
+- 16 chủ đề từ vựng: Everyday Life, School, Work, Travel, Food, Technology, Health, Business English, Shopping, Environment, Sports & Hobbies, Media & Culture, Emotions, Phrasal Verbs, Idioms, Exam Prep
+- 160 từ vựng mẫu chia đều theo chủ đề
+- 5 dạng câu hỏi: chọn nghĩa, chọn từ tiếng Anh, điền từ vào câu, nhận diện phiên âm, hiểu nghĩa theo ngữ cảnh
+- Tối đa 20 câu mỗi lượt quiz để bài học đa dạng hơn
 - Hiển thị đúng/sai và giải thích ngay sau mỗi câu
 - Lưu từ sai để ôn tập riêng
 - Lưu tiến độ offline bằng SharedPreferences
@@ -89,7 +90,7 @@ build/app/outputs/bundle/release/app-release.aab
 Kiểm tra các mục sau:
 
 - Đổi package name nếu muốn dùng thương hiệu riêng lâu dài
-- Cập nhật `version` trong `pubspec.yaml`, ví dụ `1.0.1+2`
+- Cập nhật `version` trong `pubspec.yaml`, ví dụ `1.1.0+2`
 - Build bằng keystore thật
 - Tạo Privacy Policy URL công khai từ nội dung `PRIVACY_POLICY.md`
 - Điền Data Safety theo `play_store/data_safety.md`
