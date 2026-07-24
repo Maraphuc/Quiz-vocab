@@ -1,0 +1,16 @@
+Quiz Vocab giúp bạn học từ vựng tiếng Anh bằng các câu hỏi trắc nghiệm ngắn, dễ hiểu và có thể luyện tập mỗi ngày.
+
+Tính năng chính:
+
+• Học từ vựng theo 8 chủ đề: Cuộc sống hàng ngày, Trường học, Công việc, Du lịch, Ẩm thực, Công nghệ, Sức khỏe và Tiếng Anh thương mại.
+• 3 dạng câu hỏi: chọn nghĩa tiếng Việt, chọn từ tiếng Anh đúng và điền từ vào câu.
+• Hiển thị đáp án đúng và giải thích ngay sau mỗi câu.
+• Lưu danh sách từ trả lời sai để ôn lại riêng.
+• Theo dõi tiến độ học tập: số quiz đã làm, số câu đúng, điểm cao nhất và streak học tập.
+• Hỗ trợ dark mode.
+• Có phát âm từ vựng bằng Text-to-Speech của thiết bị.
+• Không cần đăng nhập, không quảng cáo, không mua hàng trong ứng dụng.
+
+Quiz Vocab phù hợp cho học sinh, sinh viên và người học tiếng Anh từ A1 đến B2 muốn luyện từ vựng theo cách nhẹ nhàng, vui vẻ và đều đặn.
+
+Dữ liệu học tập được lưu cục bộ trên thiết bị. Ứng dụng không thu thập dữ liệu cá nhân.
