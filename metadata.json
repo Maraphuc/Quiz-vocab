@@ -1,0 +1,6 @@
+{
+  "name": "Quiz Vocab",
+  "description": "Ứng dụng học từ vựng tiếng Anh qua câu hỏi trắc nghiệm",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
