@@ -44,11 +44,29 @@ jobs:
           git checkout -- android/app/src/main/res/values/colors.xml android/app/src/main/res/drawable/launch_background.xml android/app/src/main/res/drawable/ic_launcher_foreground.xml
           rm -rf test
 
+      - name: Create temporary CI signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/ci-upload-keystore.jks \
+            -storepass android \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias upload \
+            -dname "CN=Quiz Vocab CI,O=Maraphuc,C=VN"
+          cat > android/key.properties <<'EOF'
+          storePassword=android
+          keyPassword=android
+          keyAlias=upload
+          storeFile=../ci-upload-keystore.jks
+          EOF
+
       - name: Get dependencies
         run: flutter pub get
 
       - name: Analyze Dart
         run: flutter analyze
 
-      - name: Build release app bundle with debug signing
+      - name: Build release app bundle
         run: flutter build appbundle --release
