@@ -11,7 +11,8 @@ Quiz Vocab là ứng dụng Flutter học từ vựng tiếng Anh qua câu hỏi
 - 5 dạng câu hỏi: chọn nghĩa, chọn từ tiếng Anh, điền từ vào câu, nhận diện phiên âm, hiểu nghĩa theo ngữ cảnh
 - Tối đa 20 câu mỗi lượt quiz để bài học đa dạng hơn
 - Hiển thị đúng/sai và giải thích ngay sau mỗi câu
-- Lưu từ sai để ôn tập riêng
+- Lưu từ sai để ôn tập riêng với phiên âm, ví dụ, phát âm và số lần sai
+- Reset tiến độ có hộp xác nhận để tránh bấm nhầm
 - Lưu tiến độ offline bằng SharedPreferences
 - Dark mode
 - Phát âm bằng Text-to-Speech trên thiết bị
@@ -94,14 +95,16 @@ Kiểm tra các mục sau:
 - Build bằng keystore thật
 - Tạo Privacy Policy URL công khai từ nội dung `PRIVACY_POLICY.md`
 - Điền Data Safety theo `play_store/data_safety.md`
-- Chuẩn bị icon 512x512, feature graphic 1024x500 và ảnh chụp màn hình điện thoại
+- Chuẩn bị icon 512x512, feature graphic 1024x500 và ảnh chụp màn hình điện thoại theo `play_store/assets_checklist.md`
 - Kiểm thử trên ít nhất một thiết bị Android thật
+- Tạo internal testing release trước khi mở production
 
 ## Nội dung Play Store
 
 - Mô tả ngắn: `play_store/listing/vi-VN/short_description.txt`
 - Mô tả đầy đủ: `play_store/listing/vi-VN/full_description.txt`
 - Gợi ý Data Safety: `play_store/data_safety.md`
+- Checklist asset: `play_store/assets_checklist.md`
 - Privacy Policy: `PRIVACY_POLICY.md`
 
 ## Quyền riêng tư
