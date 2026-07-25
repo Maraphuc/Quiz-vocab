@@ -38,9 +38,10 @@ android {
     buildTypes {
         release {
             signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            // Keep the first Play release simple and reliable. Shrinking can be enabled later
+            // after a signed release build is verified on real devices.
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }
