@@ -69,4 +69,21 @@ jobs:
         run: flutter analyze
 
       - name: Build release app bundle
-        run: flutter build appbundle --release
+        run: |
+          set +e
+          flutter build appbundle --release > build.log 2>&1
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "::error::flutter build appbundle failed. Last 160 log lines:"
+            tail -n 160 build.log
+            exit $status
+          fi
+          cat build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-log
+          path: build.log
+          if-no-files-found: ignore
