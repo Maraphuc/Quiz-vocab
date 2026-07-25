@@ -1,6 +1,6 @@
 # Chính sách quyền riêng tư - Quiz Vocab
 
-Cập nhật lần cuối: 24/07/2026
+Cập nhật lần cuối: 25/07/2026
 
 Quiz Vocab là ứng dụng học từ vựng tiếng Anh qua câu hỏi trắc nghiệm. Ứng dụng được thiết kế để hoạt động offline và không yêu cầu đăng nhập.
 
@@ -36,4 +36,4 @@ Người dùng có thể xóa dữ liệu học tập bằng nút "Reset tiến 
 
 ## 6. Liên hệ
 
-Vui lòng điền email hỗ trợ của nhà phát triển trong Google Play Console trước khi phát hành.
+Nếu cần hỗ trợ hoặc có câu hỏi về quyền riêng tư, vui lòng sử dụng email hỗ trợ được hiển thị trên trang Google Play của Quiz Vocab. Trước khi phát hành, nhà phát triển cần điền email hỗ trợ chính thức trong Google Play Console để người dùng có thể liên hệ trực tiếp.
