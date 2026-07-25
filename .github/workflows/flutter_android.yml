@@ -1,0 +1,91 @@
+name: Flutter Android Release Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - prepare-google-play-release-2
+
+jobs:
+  analyze-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Android SDK platform 36
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Ensure Android scaffold exists
+        run: |
+          flutter create . --platforms=android --org com.maraphuc --project-name quiz_vocab
+
+      - name: Restore release app files
+        run: |
+          git checkout -- pubspec.yaml lib/main.dart analysis_options.yaml
+          git checkout -- android/settings.gradle android/build.gradle android/gradle.properties android/app/build.gradle android/app/proguard-rules.pro
+          git checkout -- android/app/src/main/AndroidManifest.xml android/app/src/main/kotlin/com/maraphuc/quizvocab/MainActivity.kt
+          git checkout -- android/app/src/main/res/values/strings.xml android/app/src/main/res/values/styles.xml android/app/src/main/res/values-night/styles.xml
+          git checkout -- android/app/src/main/res/values/colors.xml android/app/src/main/res/drawable/launch_background.xml android/app/src/main/res/drawable/ic_launcher_foreground.xml
+          git checkout -- android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          rm -rf test
+          rm -f android/settings.gradle.kts android/build.gradle.kts android/app/build.gradle.kts
+
+      - name: Create temporary CI signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/ci-upload-keystore.jks \
+            -storepass android \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias upload \
+            -dname "CN=Quiz Vocab CI,O=Maraphuc,C=VN"
+          cat > android/key.properties <<'EOF'
+          storePassword=android
+          keyPassword=android
+          keyAlias=upload
+          storeFile=../ci-upload-keystore.jks
+          EOF
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart
+        run: flutter analyze
+
+      - name: Build release app bundle
+        run: |
+          set +e
+          flutter build appbundle --release > build.log 2>&1
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "::error::flutter build appbundle failed. Last 160 log lines:"
+            tail -n 160 build.log
+            exit $status
+          fi
+          cat build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-log
+          path: build.log
+          if-no-files-found: ignore
